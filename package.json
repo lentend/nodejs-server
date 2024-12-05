@@ -1,0 +1,21 @@
+{
+  "name": "testnodejs",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "check-file": "node checkFileType.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "aws-sdk": "^2.1691.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "file-type": "^19.1.1",
+    "multer": "^1.4.5-lts.1"
+  }
+}
