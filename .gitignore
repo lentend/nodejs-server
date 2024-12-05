@@ -19,3 +19,4 @@ compute_upload/
 uploads/
 stock.py
 traced_model.pt
+trigger.py
