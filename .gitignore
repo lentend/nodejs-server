@@ -1,0 +1,21 @@
+# Logs
+logs/
+*.log
+
+# Dependency directories
+node_modules/
+
+# Environment variables
+.env
+
+# Debugging
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+.vs
+.csv
+compute_upload/
+uploads/
+stock.py
+traced_model.pt
