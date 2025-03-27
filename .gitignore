@@ -21,5 +21,6 @@ stock.py
 traced_model.pt
 trigger.py
 .jpeg
+.mp4
 image_upload
 runs
