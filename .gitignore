@@ -20,3 +20,6 @@ uploads/
 stock.py
 traced_model.pt
 trigger.py
+.jpeg
+image_upload
+runs
