@@ -24,3 +24,4 @@ trigger.py
 .mp4
 image_upload
 runs
+aws\test1_accessKeys.csv
