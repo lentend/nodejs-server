@@ -46,25 +46,41 @@ function uploadFile(filePath) {
   const fileExtension = path.extname(fileName); // 取得檔案副檔名（如 .jpg, .mp4）
 
   // 設定 S3 中儲存檔案的路徑（images/xxx.jpg 或 images/xxx.mp4）
-  const s3Key = `images/${fileName}`;  // 這裡的 fileName 會自動使用檔案的原名稱
+  const s3Key = `images/${fileName}`;  // 使用檔案的原名稱
 
   // 根據副檔名自動判斷檔案類型
   const contentType = fileExtension === '.mp4' ? 'video/mp4' : 'image/jpeg';
 
-  // 設定上傳參數
-  const params = {
-    Bucket: process.env.BUCKET_NAME,  // S3 儲存桶名稱
-    Key: s3Key,                       // 上傳後的檔案名稱與路徑
-    Body: fileContent,                // 檔案內容
-    ContentType: contentType          // 檔案類型（'image/jpeg' 或 'video/mp4'）
+  // 先檢查檔案是否已存在於 S3
+  const headParams = {
+    Bucket: process.env.BUCKET_NAME,
+    Key: s3Key
   };
 
-  // 執行上傳
-  s3.upload(params, (err, data) => {
-    if (err) {
-      console.error("上傳失敗: ", err);
+  s3.headObject(headParams, (err, data) => {
+    if (err && err.code === 'NotFound') {
+      // 檔案不存在，執行上傳
+      console.log("檔案不存在，開始上傳...");
+
+      const uploadParams = {
+        Bucket: process.env.BUCKET_NAME,
+        Key: s3Key,
+        Body: fileContent,
+        ContentType: contentType
+      };
+
+      s3.upload(uploadParams, (uploadErr, uploadData) => {
+        if (uploadErr) {
+          console.error("上傳失敗: ", uploadErr);
+        } else {
+          console.log(`上傳成功！檔案位於: ${uploadData.Location}`);
+        }
+      });
+    } else if (err) {
+      console.error("檢查檔案時發生錯誤: ", err);
     } else {
-      console.log(`上傳成功！檔案位於: ${data.Location}`);
+      // 檔案已存在，跳過上傳
+      console.log("檔案已存在於 S3，跳過上傳: ", s3Key);
     }
   });
 }
