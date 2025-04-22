@@ -1,38 +1,40 @@
 import express from 'express';
-import multer from 'multer';
+import multer from 'multer'; // 處理 multipart-form 的上傳
 import path from 'path';
 import fs from 'fs';
-import { exec } from 'child_process';
+import { exec } from 'child_process'; // 執行外部指令（用來呼叫 Python / .cjs 腳本）
 const app = express();
 app.use(express.json());
 
+// ---------------------處理影片上傳---------------------
 app.post('/upload', async (req, res) => {
-  console.time('fileWrite');
-  const fileName = req.headers['x-filename'];
+  console.time('fileWrite'); // 記錄檔案寫入花費時間（log用途）
+  const fileName = req.headers['x-filename']; // 從 header 中取出自定義檔案名稱
   if (!fileName) {
     return res.status(400).send('Missing file name in headers');
   }
-  const uploadDir = path.resolve(process.cwd(), 'compute_upload');
-  const filePath = path.join(uploadDir, fileName);
-  const normalizedPath = path.normalize(filePath);
+  const uploadDir = path.resolve(process.cwd(), 'compute_upload'); // 上傳目錄
+  const filePath = path.join(uploadDir, fileName); // 檔案完整路徑
+  const normalizedPath = path.normalize(filePath); // 標準化路徑（處理 win/linux 差異）
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
   try {
-    // **使用 stream 直接寫入，並增加緩衝區提高效率**
-    const fileStream = fs.createWriteStream(normalizedPath, { highWaterMark: 2*1024 * 1024 }); // 2MB 緩衝區
-    req.pipe(fileStream);
+    // 建立檔案寫入串流，使用 2MB 緩衝區
+    const fileStream = fs.createWriteStream(normalizedPath, { highWaterMark: 2*1024 * 1024 });
+    req.pipe(fileStream); // 將前端上傳串流導入檔案中
 
-    fileStream.on('finish', () => {
+    fileStream.on('finish', () => { // 寫入成功
       console.timeEnd('fileWrite');
       console.log(`File saved: ${normalizedPath}`);
-      // **確認 MP4 檔案是否有效**
+      // 確認 MP4 檔案是否有效
       if (!fs.existsSync(normalizedPath) || fs.statSync(normalizedPath).size === 0) {
         return res.status(500).send('File write error, file is empty');
       }
       console.time('startYOLOv7');
       const secondScriptCommand = `python "C:/Users/User/Desktop/recognition/test/yolov7/detect.py" --weights "C:/Users/User/Desktop/recognition/test/yolov7/colab6.pt" --conf 0.3 --source "${normalizedPath}" --device 0 --no-trace`;
-
+      
+      // 執行 YOLOv7 Python 推論指令
       exec(secondScriptCommand, (error, stdout, stderr) => {
         console.timeEnd('startYOLOv7');
         if (error) {
@@ -42,6 +44,17 @@ app.post('/upload', async (req, res) => {
         }
         console.log(`YOLOv7 output: ${stdout}`);
         res.status(200).send('Video uploaded and processed');
+        // 呼叫 CJS 腳本，上傳影片到 AWS S3
+        const uploaderScript = path.resolve('C:/Users/User/Desktop/testnodejs/aws/new_test/up.cjs');
+        const uploadCmd = `node "${uploaderScript}" "${normalizedPath}"`;
+        exec(uploadCmd, (uploadErr, uploadStdout, uploadStderr) => {
+          if (uploadErr) {
+            console.error('S3 上傳失敗:', uploadErr.message);
+            console.error('stderr:', uploadStderr);
+          } else {
+            console.log('S3 上傳成功:\n', uploadStdout);
+          }
+        });
       });
     });
     fileStream.on('error', (err) => {
@@ -54,12 +67,12 @@ app.post('/upload', async (req, res) => {
   }
 });
 
-// **將 HTTP 數據流轉換為 Buffer**
+// 將 HTTP 數據流轉換為 Buffer,暫時無用到,寫入速度不夠快
 function streamToBuffer(stream) {
   return new Promise((resolve, reject) => {
-    const chunks = [];
-    stream.on('data', (chunk) => chunks.push(chunk));
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
+    const chunks = []; // 暫存接收到的每個資料區塊
+    stream.on('data', (chunk) => chunks.push(chunk)); // 每當有資料，就加入 chunks 陣列
+    stream.on('end', () => resolve(Buffer.concat(chunks))); // 資料接收完成後，合併所有 chunks 為一個完整 Buffer 回傳
     stream.on('error', reject);
   });
 }
@@ -69,13 +82,13 @@ app.get('/', (req, res) => {
   res.send('hi');
 });
 
-// get_file.py使用，獲取上傳的影片用
+// 獲取上傳的影片用，測試用
 app.get('/video/:filename', (req, res) => {
   const filePath = path.join(process.cwd(), 'uploads', req.params.filename);
   res.sendFile(filePath);
 });
 
-// get_file.py使用，新增的路由：獲取 uploads 目錄中的所有文件
+// 列出 uploads 目錄中的所有文件，測試用
 app.get('/files', (req, res) => {
   const directoryPath = path.join(process.cwd(), 'uploads');
   fs.readdir(directoryPath, (err, files) => {
@@ -86,35 +99,34 @@ app.get('/files', (req, res) => {
   });
 });
 
-//取得最大的exp檔案名稱
+// 取得最大的exp檔案名稱(最新辨識的結果),用於app端歷史紀錄
 app.get('/getmax_dir', (req, res) => {
   const baseDir = path.join(process.cwd(), 'runs/detect');
-
+  // 讀取 runs/detect 下的所有檔案
   fs.readdir(baseDir, (err, files) => {
     if (err) {
       return res.status(500).send('Unable to scan directory');
     }
-
+    // 篩選出 'exp' 開頭的資料夾
     const expDirs = files.filter(file => fs.statSync(path.join(baseDir, file)).isDirectory() && file.startsWith('exp'));
+    // 找出數字最大的 exp 資料夾
     const maxExpDir = expDirs.reduce((max, dir) => {
       const num = parseInt(dir.replace('exp', ''));
       return num > parseInt(max.replace('exp', '')) ? dir : max;
     }, 'exp0');
-
     if (!maxExpDir) {
       return res.status(404).send('No exp directories found');
     }
-
     res.send(maxExpDir); // 直接回傳最大 exp 資料夾名稱
   });
 });
 
 
-// app點擊"播放结果"後使用，獲取runs/detect/exp中的影片，並執行外部上傳腳本
+// app點擊"播放结果"後使用，獲取runs/detect/exp中的影片
 app.get('/processed_video/:filename', (req, res) => {
   const baseDir = path.join(process.cwd(), 'runs/detect');
   
-  // 讀取 baseDir 目錄中的所有子目錄
+  // 讀取 baseDir 目錄中的所有檔案
   fs.readdir(baseDir, (err, files) => {
     if (err) {
       return res.status(500).send('Unable to scan directory');
@@ -127,7 +139,8 @@ app.get('/processed_video/:filename', (req, res) => {
       return num > parseInt(max.replace('exp', '')) ? dir : max;
     }, 'exp0'); // 初始化為 'exp0'，假設至少有一個 exp 目錄
 
-    const filePath = path.join(baseDir, maxExpDir, req.params.filename);
+    const filePath = path.join(baseDir, maxExpDir, req.params.filename); // 組成完整檔案路徑
+    // 回傳影片檔案
     res.sendFile(filePath, err => {
       if (err) {
         res.status(500).send('Error sending file');
@@ -174,7 +187,7 @@ app.get('/processed_data/:filename', (req, res) => {
 // 設定 multer 的儲存引擎，用於圖片的上傳
 const imageStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const folder = 'image_upload/'; // 使用已建立的目錄
+    const folder = 'image_upload/'; // 指定圖片儲存目錄
     cb(null, folder); // 指定目錄
   },
   filename: function (req, file, cb) {
@@ -182,10 +195,10 @@ const imageStorage = multer.diskStorage({
   }
 });
 
-// 使用專屬的存儲引擎處理圖片上傳
+// 使用imageStorage處理圖片上傳
 const uploadPhoto = multer({ storage: imageStorage });
 
-// 修改 /upload-photo 路由，使用圖片專用的 multer
+// 接收圖片上傳並執行 YOLOv7 分析 + 上傳到 AWS S3
 app.post('/upload-photo', uploadPhoto.single('photo'), (req, res) => {
   if (!req.file) {
     return res.status(400).send('No photo uploaded');
@@ -199,7 +212,7 @@ app.post('/upload-photo', uploadPhoto.single('photo'), (req, res) => {
   const imgScriptCommand = `python ${imgScriptPath} --weights ${weights} --conf ${conf} --source ${source} --device ${device} --no-trace `;
   console.log(`Photo uploaded: ${req.file.filename}`);
   console.log(`Executing Python script: ${imgScriptCommand}`);
-  // 執行 Python 腳本
+  // 執行 YOLOv7 推論腳本
   exec(imgScriptCommand, (error, stdout, stderr) => {
     if (error) {
       console.error(`Error executing Python script: ${error.message}`);
@@ -208,11 +221,24 @@ app.post('/upload-photo', uploadPhoto.single('photo'), (req, res) => {
     }
     console.log(`Python script output: ${stdout}`);
     res.status(200).send(`Photo uploaded and processed successfully: ${stdout}`);
+    // === 成功處理並回傳200後，呼叫 CJS 腳本上傳圖片到 S3 ===
+    const uploaderScript = path.resolve('C:/Users/User/Desktop/testnodejs/aws/new_test/up.cjs');
+    const uploadCmd = `node "${uploaderScript}" "${source}"`; // 傳入圖片絕對路徑
+
+    exec(uploadCmd, (uploadErr, uploadStdout, uploadStderr) => {
+      if (uploadErr) {
+        console.error('S3 上傳失敗:', uploadErr.message);
+        console.error('stderr:', uploadStderr);
+      } else {
+        console.log('S3 上傳成功:\n', uploadStdout);
+      }
+    });
+    // === 結束 S3 上傳 ===
   });
 });
 
 //--------------------------------------------------------
-// 新增端口: 返回 exp 資料夾中的檔案
+// 獲取runs/detect/exp中的"圖片"
 app.get('/get_exp_file', (req, res) => {
   const expName = req.query.exp; // 獲取 exp 名稱
   const fileName = req.query.fileName; // 獲取檔案名稱
