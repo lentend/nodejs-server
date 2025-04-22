@@ -1,5 +1,7 @@
-本專案為 YOLOv7 圖片/影片辨識後端伺服器，請搭配以下前端專案一併使用：  
-https://github.com/lentend/banana-app.git
+## 專案說明
+
+本專案為個人專題練習，搭配 YOLOv7 處理圖片與影片後端辨識。
+請搭配以下前端專案一併使用：https://github.com/lentend/banana-app.git
 
 ## 執行方式
 
