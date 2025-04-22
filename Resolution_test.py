@@ -1,4 +1,4 @@
-# 分辨率測試
+# 解析度測試
 import cv2
 
 def get_video_resolution(video_path):
@@ -24,6 +24,6 @@ video_path = r"C:\Users\User\Desktop\testnodejs\compute_upload\a774452988a8d79f9
 resolution = get_video_resolution(video_path)
 
 if resolution:
-    print(f"影片分辨率: {resolution[0]}x{resolution[1]}")
+    print(f"影片解析度: {resolution[0]}x{resolution[1]}")
 else:
-    print("無法獲取影片分辨率")
+    print("無法獲取影片解析度")
