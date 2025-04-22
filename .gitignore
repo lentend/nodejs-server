@@ -25,3 +25,6 @@ trigger.py
 image_upload
 runs
 aws\test1_accessKeys.csv
+get_file.py
+runs\detect\exp
+aws/test1_accessKeys.csv
