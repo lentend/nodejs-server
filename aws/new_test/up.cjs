@@ -1,10 +1,10 @@
-// 引入 dotenv 和 AWS SDK
+// 載入 dotenv 並指定 .env 檔路徑，用來讀取 AWS 憑證與設定
 require('dotenv').config({ path: 'c:/Users/User/Desktop/testnodejs/aws/new_test/.env' });
 const fs = require('fs'); // 用於讀取本地檔案
-const AWS = require('aws-sdk');
+const AWS = require('aws-sdk'); // 載入 AWS SDK 模組
 const path = require('path'); // 用於處理檔案路徑
 
-// 初始化 S3 設定
+// 初始化 S3 設定，讀取 .env 中的金鑰與區域資訊(替換為自己用的)
 const s3 = new AWS.S3({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -23,25 +23,21 @@ if (!filePathFromArgs) {
   console.error("請提供檔案路徑作為參數");
   process.exit(1);
 }
-
 const filePath = formatFilePath(filePathFromArgs);
 
-
-// 上傳函式：接受一個 `filePath` 作為參數來指定上傳的檔案路徑
+// 上傳檔案到 AWS S3 的函式
 function uploadFile(filePath) {
   if (!process.env.BUCKET_NAME) {
     console.error("Bucket Name 未設定，請檢查 .env 檔案中的 BUCKET_NAME 是否正確設定。");
     return;
   }
-
   // 檢查檔案路徑是否存在
   if (!fs.existsSync(filePath)) {
     console.error("指定的檔案路徑不存在: ", filePath);
     return;
   }
-
   // 讀取本地檔案
-  const fileContent = fs.readFileSync(filePath);
+  const fileContent = fs.readFileSync(filePath); // 讀取檔案內容
   const fileName = path.basename(filePath); // 取得檔案名稱（含副檔名）
   const fileExtension = path.extname(fileName); // 取得檔案副檔名（如 .jpg, .mp4）
 
@@ -85,9 +81,5 @@ function uploadFile(filePath) {
   });
 }
 
-/* 呼叫 `uploadFile` 函式時傳入檔案路徑作為參數，原路徑
-const filePathFromOtherModule = formatFilePath('C:/Users/User/Desktop/banana_day7.mp4'); // 從其他檔案傳入的路徑
-uploadFile(filePathFromOtherModule);*/
-
-/* 呼叫 `uploadFile` 函式時傳入檔案路徑作為參數，新路徑*/
+// 主程式執行入口
 uploadFile(filePath);
